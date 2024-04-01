@@ -1,8 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { waveData } from "./stores";
-    import { Vector, lerp } from "./maths";
-    import { WAVE_RES } from "./consts";
+    import { Vector } from "./maths";
 
     export let bestLine: Float32Array
 
@@ -104,14 +103,14 @@
 
     function dataToScreen(index: number, value: number): Vector {
         return new Vector(
-            (index / WAVE_RES) * canvasRes.x,
+            (index / $waveData.length) * canvasRes.x,
             canvasRes.y - ((value + 1) / 2) * canvasRes.y
         )
     }
 
     function screenToData(pos: Vector): Vector {
         return new Vector(
-            Math.floor((pos.x / canvasRes.x) * WAVE_RES),
+            Math.floor((pos.x / canvasRes.x) * $waveData.length),
             (((canvasRes.y -  pos.y) / canvasRes.y)) * 2 - 1
         )
     }

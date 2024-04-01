@@ -37,9 +37,9 @@ fn main() {
     let pointer_regex = Regex::new(r"\*mut f32").unwrap();
     let modified_bindings = pointer_regex.replace_all(&generated_bindings, "CudaSlice<f32>");
     let modified_bindings = format!(
-        "use serde::Deserialize;\n{}",
+        "use serde::Deserialize;\nuse ts_rs::TS;\n{}",
         Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s*struct HyperParameters").unwrap()
-            .replace_all(&modified_bindings, "#[derive($d, Deserialize)]\npub struct HyperParameters")
+            .replace_all(&modified_bindings, "#[derive($d, Deserialize, TS)]\n#[ts(export)]\npub struct HyperParameters")
     );
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());

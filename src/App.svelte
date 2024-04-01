@@ -1,21 +1,22 @@
 <script lang="ts">
     import { invoke } from "@tauri-apps/api";
     import WaveDrawer from "./lib/WaveDrawer.svelte";
-    import { WAVE_RES } from "./lib/consts";
     import { waveData } from "./lib/stores";
-    // import type { HyperParameters } from "$lib/wasm-helpers";
-    // import * as wasm from "$lib/wasm/trainer"
-    import { onMount } from "svelte";
+    import { type HyperParameters } from "../src-tauri/bindings/HyperParameters"
 
-    let bestLine = new Float32Array(WAVE_RES)
+    invoke('wave_res')
+        .then(v => {
+            const value = v as number
+            $waveData = new Float32Array(value)
+        })
+
+    $: bestLine = new Float32Array($waveData.length)
     let bestFormula = ""
     let bestFitness = 0
 
     let stepCount = 1
 
-    let training = false
-
-    const params = {
+    const params: HyperParameters = {
         starting_functions: 1,
         selection_fraction: 0.2,
         mutation_probability: 0.1,
@@ -24,28 +25,7 @@
         function_subtraction_probability: 0.1,
     }
 
-    onMount(() => {
-        // wasm.init()
-        console.log($waveData)
-        // wasm.greet()
-
-        // setInterval(() => {
-        //     if (training) {
-        //         // wasm.step_training()
-        //         // bestLine = wasm.get_best_output()
-        //         // bestFormula = wasm.get_best_formula()
-        //     }
-        // }, 1)
-    })
-
     async function step() {
-        // for (let i = 0; i < stepCount; i++)
-        //     wasm.step_training()
-
-        // bestLine = wasm.get_best_output()
-        // bestFormula = wasm.get_best_formula()
-
-        // training = !training
         await invoke('step_training', { quantity: stepCount })
         bestFormula = await invoke('best_formula')
 
@@ -61,7 +41,9 @@
 
 <main>    
     <div class="drawer-container">
-        <WaveDrawer bestLine={bestLine} />
+        {#if $waveData.length > 0}
+            <WaveDrawer bestLine={bestLine} />
+        {/if}
         <div>{bestFormula}</div>
     </div>
     <button on:click={initTraining}>Start Training</button>

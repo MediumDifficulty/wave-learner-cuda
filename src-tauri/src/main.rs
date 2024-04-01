@@ -110,7 +110,7 @@ impl CudaState {
         let step_kernel = cuda_device.get_func("trainer", "step_kernel").unwrap();
         let step_sort_kernel = cuda_device.get_func("trainer", "step_sort_kernel").unwrap();
         let output_kernel = cuda_device.get_func("trainer", "output_kernel").unwrap();
-        
+
         Self {
             cuda_device,
             agents,
@@ -266,6 +266,11 @@ fn output(index: i32, cuda: State<Mutex<CudaState>>) -> Vec<f32> {
     cuda_lock.output(index)
 }
 
+#[tauri::command]
+fn wave_res() -> usize {
+    WAVE_RES
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(Mutex::new(CudaState::new()))
@@ -275,6 +280,7 @@ fn main() {
             best_fitness,
             best_formula,
             output,
+            wave_res,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
