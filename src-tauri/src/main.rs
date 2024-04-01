@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::{Arc, Mutex};
+use std::{mem, sync::{Arc, Mutex}, time::Instant};
 
 use cudarc::{driver::{CudaDevice, CudaFunction, CudaSlice, DeviceRepr, LaunchAsync, LaunchConfig, ValidAsZeroBits}, nvrtc::Ptx};
 use tauri::State;
@@ -47,8 +47,12 @@ impl Default for FunctionCoefficients {
     }
 }
 
-const POPULATION_SIZE: usize = 2048;
+const POPULATION_SIZE: usize = 1 << 26;
 const WAVE_RES: usize = 512;
+
+const GPU_ALLOCATED: usize =
+    POPULATION_SIZE * (mem::size_of::<Agent>() + mem::size_of::<CurandState>()) +
+    WAVE_RES * (mem::size_of::<f32>() * 2);
 
 const TRAINER_PTX: &str = include_str!(concat!(env!("OUT_DIR"), "/trainer.ptx"));
 
@@ -95,6 +99,8 @@ impl CudaState {
         // TODO: Precompile it and use `from_file` instead
         cuda_device.load_ptx(Ptx::from_src(TRAINER_PTX), "trainer", &["init_kernel", "step_kernel", "step_sort_kernel", "output_kernel"]).unwrap();
 
+        println!("Allocating {}Gb on GPU...", (GPU_ALLOCATED as f64 / 10_000_000.).round() / 100.);
+
         let agents = cuda_device.alloc_zeros::<Agent>(POPULATION_SIZE).unwrap();
         let curand_states = cuda_device.alloc_zeros::<CurandState>(POPULATION_SIZE).unwrap();
         let goal = cuda_device.alloc_zeros::<f32>(WAVE_RES).unwrap();
@@ -104,7 +110,7 @@ impl CudaState {
         let step_kernel = cuda_device.get_func("trainer", "step_kernel").unwrap();
         let step_sort_kernel = cuda_device.get_func("trainer", "step_sort_kernel").unwrap();
         let output_kernel = cuda_device.get_func("trainer", "output_kernel").unwrap();
-
+        
         Self {
             cuda_device,
             agents,
@@ -158,7 +164,7 @@ impl CudaState {
                         bottom as i32,
                     )).unwrap();
             }
-    
+            
             self.sort_agents();
         }
 
@@ -235,16 +241,16 @@ fn init_training(params: HyperParameters, goal: Vec<f32>, seed: u64, cuda: State
 
 #[tauri::command]
 fn step_training(quantity: usize, cuda: State<Mutex<CudaState>>) {
-    println!("Step");
+    let start_time = Instant::now();
     let mut cuda_lock = cuda.lock().unwrap();
     cuda_lock.step(quantity);
+    println!("{quantity} steps took {}ms", start_time.elapsed().as_millis());
 }
 
 #[tauri::command]
 fn best_fitness(cuda: State<Mutex<CudaState>>) -> f32 {
     let mut cuda_lock = cuda.lock().unwrap();
     let r = cuda_lock.best();
-    println!("{r:?}");
     r.fitness
 }
 
